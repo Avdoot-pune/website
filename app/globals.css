@@ -1,0 +1,205 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #020617;
+  --panel: rgba(15, 23, 42, 0.72);
+  --panel-strong: rgba(15, 23, 42, 0.9);
+  --border: rgba(148, 163, 184, 0.14);
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --cyan: #22d3ee;
+  --blue: #60a5fa;
+  --violet: #8b5cf6;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top, rgba(56, 189, 248, 0.14), transparent 30%),
+    radial-gradient(circle at 80% 20%, rgba(129, 140, 248, 0.16), transparent 24%),
+    radial-gradient(circle at 20% 80%, rgba(34, 211, 238, 0.12), transparent 22%),
+    linear-gradient(180deg, #020617 0%, #020617 32%, #020617 100%);
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  content: "";
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(circle at center, black 35%, transparent 85%);
+  pointer-events: none;
+}
+
+body::after {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background:
+    radial-gradient(circle at 15% 15%, rgba(34, 211, 238, 0.22), transparent 22%),
+    radial-gradient(circle at 85% 25%, rgba(96, 165, 250, 0.16), transparent 18%),
+    radial-gradient(circle at 50% 75%, rgba(139, 92, 246, 0.12), transparent 18%);
+  filter: blur(40px);
+  animation: drift 18s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+::selection {
+  background: rgba(96, 165, 250, 0.35);
+  color: white;
+}
+
+a,
+button {
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.font-heading {
+  font-family: var(--font-heading), sans-serif;
+}
+
+.font-mono {
+  font-family: var(--font-mono), monospace;
+}
+
+.panel {
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.86), rgba(15, 23, 42, 0.68));
+  backdrop-filter: blur(18px);
+  box-shadow:
+    0 20px 80px rgba(2, 6, 23, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.panel-strong {
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(15, 23, 42, 0.8));
+  box-shadow:
+    0 24px 70px rgba(8, 47, 73, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.gradient-ring {
+  position: relative;
+}
+
+.gradient-ring::before {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(34, 211, 238, 0.5),
+    rgba(96, 165, 250, 0.28),
+    rgba(139, 92, 246, 0.4)
+  );
+  content: "";
+  z-index: -1;
+}
+
+.section-kicker {
+  color: #67e8f9;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.section-title {
+  font-family: var(--font-heading), sans-serif;
+  font-size: clamp(2rem, 3vw, 3rem);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.section-copy {
+  color: var(--muted);
+  font-size: 1.04rem;
+  line-height: 1.7;
+}
+
+.hero-title {
+  font-family: var(--font-heading), sans-serif;
+  font-size: clamp(3rem, 7vw, 6rem);
+  line-height: 0.95;
+  letter-spacing: -0.06em;
+}
+
+.spotlight {
+  position: absolute;
+  inset: auto auto 0 0;
+  width: 18rem;
+  height: 18rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.24), transparent 68%);
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.scanline {
+  position: relative;
+  overflow: hidden;
+}
+
+.scanline::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(34, 211, 238, 0.05) 48%,
+    transparent 100%
+  );
+  content: "";
+  animation: scan 4.6s linear infinite;
+  pointer-events: none;
+}
+
+.fade-grid {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.1) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+
+@keyframes drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(0, -24px, 0) scale(1.06);
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes scan {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
