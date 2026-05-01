@@ -39,6 +39,32 @@ BOT_PATTERN = re.compile(r"automated|auto|bot", re.I)
 ARTIFACT_DIR = Path(__file__).resolve().parent / ".model_cache"
 ARTIFACT_TTL = timedelta(hours=12)
 USER_AGENT = "AI-Sprint-Risk-Analyzer/2.0"
+MODEL_ARCHITECTURE = [
+    {
+        "layer": "Rule-Based Agile Signals",
+        "role": "Uses domain metrics such as cycle time, comments, urgency language, and repo-relative deviation.",
+    },
+    {
+        "layer": "Supervised ML",
+        "role": "Calibrated XGBoost estimates known sprint-risk patterns from generated historical labels.",
+    },
+    {
+        "layer": "Unsupervised ML",
+        "role": "Isolation Forest flags unusual PR behavior without needing failure labels.",
+    },
+    {
+        "layer": "Mitigation Engine",
+        "role": "Maps root causes to Agile actions, ROAM ownership, and simulated risk reduction.",
+    },
+]
+MODEL_JUSTIFICATION = (
+    "We combine supervised learning for known risk patterns with unsupervised anomaly "
+    "detection to capture unknown Agile failures."
+)
+MITIGATION_JUSTIFICATION = (
+    "We extend risk prediction into a closed-loop system by generating actionable mitigations "
+    "and simulating their impact on sprint outcomes."
+)
 
 warnings.filterwarnings("ignore", category=FutureWarning, module="sklearn.calibration")
 
@@ -189,6 +215,7 @@ def enrich_repo_rows(repo_rows):
             [[row["cycle_time_days"], row["num_comments"], row["risk_score"]] for row in repo_rows],
             dtype=float,
         )
+        # Isolation Forest learns repo-normal PR behavior and flags unusual Agile risk patterns.
         isolation_forest = IsolationForest(contamination=0.1, random_state=42)
         flags = (isolation_forest.fit_predict(anomaly_matrix) == -1).astype(int)
     else:
@@ -431,6 +458,185 @@ def derive_factor_scores(rows):
     }
 
 
+def get_risk_drivers(row):
+    drivers = {
+        "cycle_time": float(row["cycle_time_norm"]),
+        "discussion": float(row["comments_norm"]),
+        "complexity": float(row["cycle_vs_repo"]),
+        "text_risk": float(row["text_risk"]),
+        "anomaly": float(row["anomaly_flag"]),
+    }
+
+    total = sum(drivers.values()) + 1e-6
+    return {driver: round(value / total, 3) for driver, value in drivers.items()}
+
+
+def generate_actions(row):
+    actions = []
+
+    if row["cycle_time_norm"] > 1:
+        actions.append(
+            {
+                "action": "Break PR into smaller tasks or create a refactoring spike.",
+                "framework": "Risk-Adjusted Backlog",
+                "type": "MITIGATE",
+                "impact": "Reduces execution delay.",
+            }
+        )
+
+    if row["comments_norm"] > 1:
+        actions.append(
+            {
+                "action": "Escalate in daily standup or use pair programming for fast alignment.",
+                "framework": "ART",
+                "type": "OWN",
+                "impact": "Reduces coordination risk.",
+            }
+        )
+
+    if row["cycle_vs_repo"] > 1.5:
+        actions.append(
+            {
+                "action": "Re-estimate the task and re-plan sprint scope.",
+                "framework": "RIMPRO",
+                "type": "MITIGATE",
+                "impact": "Improves predictability.",
+            }
+        )
+
+    if row["text_risk"] > 0:
+        actions.append(
+            {
+                "action": "Prioritize the bug fix in the risk-adjusted backlog.",
+                "framework": "Risk-Adjusted Backlog",
+                "type": "MITIGATE",
+                "impact": "Reduces defect propagation.",
+            }
+        )
+
+    if row["anomaly_flag"] == 1:
+        actions.append(
+            {
+                "action": "Trigger an investigation spike for unexpected behavior.",
+                "framework": "Risk Spike",
+                "type": "MITIGATE",
+                "impact": "Reduces uncertainty.",
+            }
+        )
+
+    if not actions:
+        actions.append(
+            {
+                "action": "Monitor in sprint review and keep the backlog item unchanged.",
+                "framework": "ROAM",
+                "type": "ACCEPT",
+                "impact": "Maintains visibility without adding unnecessary process.",
+            }
+        )
+
+    return actions
+
+
+def roam_classify(score):
+    if score > 0.85:
+        return "MITIGATE"
+    if score > 0.65:
+        return "OWN"
+    if score > 0.40:
+        return "ACCEPT"
+    return "RESOLVED"
+
+
+def simulate_mitigation(row):
+    improved = dict(row)
+
+    improved["cycle_time_norm"] *= 0.75
+    improved["comments_norm"] *= 0.80
+    improved["cycle_vs_repo"] *= 0.80
+
+    new_probability = compute_probability(improved)
+    new_impact = compute_impact(improved)
+    mitigated_rule_risk = (0.65 * new_probability) + (0.35 * new_impact)
+    ml_risk = float(row.get("ml_risk_score", row.get("probability", 0.0)))
+
+    return clamp((0.60 * mitigated_rule_risk) + (0.40 * ml_risk))
+
+
+def summarize_mitigation(row):
+    return {
+        "title": row["title"],
+        "risk": round(float(row["hybrid_risk_score"]), 3),
+        "after_mitigation": round(float(row["mitigated_risk"]), 3),
+        "reduction": round(float(row["risk_reduction"]), 3),
+        "roam": row["roam_category"],
+        "root_causes": row["risk_drivers"],
+        "actions": [action["action"] for action in row["mitigation_actions"]],
+    }
+
+
+def apply_mitigation_engine(rows):
+    for row in rows:
+        row["risk_drivers"] = get_risk_drivers(row)
+        row["mitigation_actions"] = generate_actions(row)
+        row["roam_category"] = roam_classify(row["hybrid_risk_score"])
+        row["mitigated_risk"] = simulate_mitigation(row)
+        row["risk_reduction"] = max(0.0, row["hybrid_risk_score"] - row["mitigated_risk"])
+        row["mitigation_summary"] = summarize_mitigation(row)
+
+    return rows
+
+
+def aggregate_mitigation_insights(rows):
+    if not rows:
+        return {
+            "expected_risk_reduction": 0.0,
+            "top_roam_category": "RESOLVED",
+            "recommended_actions": [],
+            "decision_outputs": [],
+        }
+
+    recent = sorted(rows, key=lambda item: item["merged_at"], reverse=True)[:24]
+    high_value_rows = sorted(
+        recent,
+        key=lambda item: (item["risk_reduction"], item["hybrid_risk_score"]),
+        reverse=True,
+    )
+    roam_counts = defaultdict(int)
+    action_rank = defaultdict(lambda: {"count": 0, "type": "", "framework": "", "impact": ""})
+
+    for row in recent:
+        roam_counts[row["roam_category"]] += 1
+        for action in row["mitigation_actions"]:
+            entry = action_rank[action["action"]]
+            entry["count"] += 1
+            entry["type"] = action["type"]
+            entry["framework"] = action["framework"]
+            entry["impact"] = action["impact"]
+
+    top_roam_category = max(roam_counts.items(), key=lambda item: item[1])[0] if roam_counts else "RESOLVED"
+    recommended_actions = [
+        {
+            "action": action,
+            "count": payload["count"],
+            "type": payload["type"],
+            "framework": payload["framework"],
+            "impact": payload["impact"],
+        }
+        for action, payload in sorted(
+            action_rank.items(),
+            key=lambda item: item[1]["count"],
+            reverse=True,
+        )[:5]
+    ]
+
+    return {
+        "expected_risk_reduction": round(mean([row["risk_reduction"] for row in recent], default=0.0), 3),
+        "top_roam_category": top_roam_category,
+        "recommended_actions": recommended_actions,
+        "decision_outputs": [row["mitigation_summary"] for row in high_value_rows[:5]],
+    }
+
+
 def analyze_repository(repo_url):
     owner, repo = parse_repo_url(repo_url)
     artifact = load_or_train_artifact(owner, repo)
@@ -450,10 +656,12 @@ def analyze_repository(repo_url):
         row["ml_risk_score"] = float(ml_probability)
         row["hybrid_risk_score"] = clamp((0.60 * row["final_risk_score"]) + (0.40 * row["ml_risk_score"]))
 
+    target_rows = apply_mitigation_engine(target_rows)
     recent_rows = sorted(target_rows, key=lambda item: item["merged_at"], reverse=True)[:24]
     sprint_series = build_sprint_series(target_rows, "hybrid_risk_score")
     failure_probability = monte_carlo_failure_probability(sprint_series, f"{owner}/{repo}")
     factor_scores = derive_factor_scores(target_rows)
+    mitigation_insights = aggregate_mitigation_insights(target_rows)
     ranked_factors = sorted(factor_scores.items(), key=lambda item: item[1], reverse=True)
     selected_factors = [factor for factor, score in ranked_factors if score >= 0.30][:4]
     if not selected_factors:
@@ -475,7 +683,27 @@ def analyze_repository(repo_url):
         "failure_probability": round(failure_probability, 2),
         "risk_level": classify_risk_level(risk_score),
         "risk_factors": selected_factors,
-        "model_type": "calibrated_xgboost_hybrid",
+        "model_type": "hybrid_rule_xgboost_isolation_forest_mitigation",
+        "model_architecture": MODEL_ARCHITECTURE,
+        "model_justification": MODEL_JUSTIFICATION,
+        "mitigation_justification": MITIGATION_JUSTIFICATION,
+        "mitigation_engine": {
+            "frameworks": ["RIMPRO", "ART", "ROAM", "Risk-Adjusted Backlog", "Risk Spikes"],
+            "capabilities": [
+                "Root cause decomposition",
+                "Agile-native mitigation actions",
+                "ROAM classification",
+                "Simulated mitigation impact",
+                "Decision-ready sprint outputs",
+            ],
+            **mitigation_insights,
+        },
+        "anomaly_detection": {
+            "model": "Isolation Forest",
+            "learning_type": "Unsupervised ML",
+            "uses_failure_labels": False,
+            "risk_engine_effect": "Adds risk pressure when anomaly_flag is 1.",
+        },
         "model_trained_at": artifact["trained_at"],
         "training_mode": artifact.get("training_mode", "cross_repo_reference"),
         "analysis_mode": "sparse_history_fallback" if sparse_history else "full_history",

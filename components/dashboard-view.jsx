@@ -34,6 +34,13 @@ function labelForFactor(factor) {
   return factorLabels[factor] ?? factor.replaceAll("_", " ");
 }
 
+function compactTitle(value) {
+  if (!value) {
+    return "Untitled pull request";
+  }
+  return value.length > 84 ? `${value.slice(0, 81)}...` : value;
+}
+
 function Metric({ label, value, toneClass }) {
   return (
     <div className={`rounded-[1.5rem] border px-5 py-5 ${toneClass}`}>
@@ -42,6 +49,21 @@ function Metric({ label, value, toneClass }) {
     </div>
   );
 }
+
+const defaultArchitecture = [
+  {
+    layer: "Rule-Based Agile Signals",
+    role: "Uses domain metrics such as cycle time, comments, urgency language, and repo-relative deviation."
+  },
+  {
+    layer: "Supervised ML",
+    role: "Calibrated XGBoost estimates known sprint-risk patterns from generated historical labels."
+  },
+  {
+    layer: "Unsupervised ML",
+    role: "Isolation Forest flags unusual PR behavior without needing failure labels."
+  }
+];
 
 export default function DashboardView() {
   const searchParams = useSearchParams();
@@ -120,6 +142,28 @@ export default function DashboardView() {
   }
 
   const toneClass = levelTone(payload.risk_level);
+  const modelArchitecture =
+    Array.isArray(payload.model_architecture) && payload.model_architecture.length > 0
+      ? payload.model_architecture
+      : defaultArchitecture;
+  const modelJustification =
+    payload.model_justification ||
+    "We combine supervised learning for known risk patterns with unsupervised anomaly detection to capture unknown Agile failures.";
+  const anomalyDetection = payload.anomaly_detection || {
+    model: "Isolation Forest",
+    learning_type: "Unsupervised ML",
+    risk_engine_effect: "Adds risk pressure when anomaly_flag is 1."
+  };
+  const mitigationEngine = payload.mitigation_engine || {};
+  const mitigationJustification =
+    payload.mitigation_justification ||
+    "We extend risk prediction into a closed-loop system by generating actionable mitigations and simulating their impact on sprint outcomes.";
+  const recommendedActions = Array.isArray(mitigationEngine.recommended_actions)
+    ? mitigationEngine.recommended_actions
+    : [];
+  const decisionOutputs = Array.isArray(mitigationEngine.decision_outputs)
+    ? mitigationEngine.decision_outputs
+    : [];
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -150,6 +194,95 @@ export default function DashboardView() {
           value="Complete"
           toneClass="border-white/10 bg-white/5 text-slate-100"
         />
+      </div>
+
+      <div className="panel rounded-[2rem] p-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="section-kicker">Hybrid Intelligence</p>
+            <h2 className="font-heading mt-3 text-2xl font-semibold text-white">Risk Engine Architecture</h2>
+          </div>
+          <div className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-100">
+            {anomalyDetection.model}
+          </div>
+        </div>
+        <p className="mt-5 max-w-4xl text-slate-300">{modelJustification}</p>
+
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
+          {modelArchitecture.map((item) => (
+            <div key={item.layer} className="rounded-[1.5rem] border border-white/8 bg-slate-950/70 p-5">
+              <p className="font-heading text-lg font-semibold text-white">{item.layer}</p>
+              <p className="mt-3 text-sm leading-6 text-slate-400">{item.role}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 rounded-[1.5rem] border border-white/8 bg-white/5 p-5 text-sm leading-6 text-slate-300">
+          <span className="font-semibold text-white">{anomalyDetection.learning_type}</span>
+          {" detects unusually long cycle times, heavy discussion, and odd combinations of PR signals. "}
+          {anomalyDetection.risk_engine_effect}
+        </div>
+      </div>
+
+      <div className="panel rounded-[2rem] p-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="section-kicker">Mitigation Engine</p>
+            <h2 className="font-heading mt-3 text-2xl font-semibold text-white">Closed-Loop Agile Decisions</h2>
+          </div>
+          <div className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-100">
+            ROAM: {mitigationEngine.top_roam_category || "RESOLVED"}
+          </div>
+        </div>
+        <p className="mt-5 max-w-4xl text-slate-300">{mitigationJustification}</p>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-[0.65fr_1.35fr]">
+          <div className="rounded-[1.5rem] border border-emerald-400/20 bg-emerald-400/10 p-5">
+            <p className="text-xs uppercase tracking-[0.24em] text-emerald-100/80">Simulated Risk Reduction</p>
+            <p className="mt-3 font-heading text-3xl font-semibold text-white">
+              {toPercent(mitigationEngine.expected_risk_reduction)}
+            </p>
+            <p className="mt-3 text-sm leading-6 text-emerald-50/80">
+              Estimated from cycle-time, discussion, and repo-relative complexity improvements.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {recommendedActions.slice(0, 4).map((item) => (
+              <div key={item.action} className="rounded-[1.5rem] border border-white/8 bg-slate-950/70 p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-heading text-base font-semibold text-white">{item.framework}</p>
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">
+                    {item.type}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate-300">{item.action}</p>
+                <p className="mt-3 text-xs leading-5 text-slate-500">{item.impact}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {decisionOutputs.length > 0 && (
+          <div className="mt-6 space-y-3">
+            {decisionOutputs.slice(0, 3).map((item) => (
+              <div
+                key={`${item.title}-${item.risk}`}
+                className="rounded-[1.5rem] border border-white/8 bg-white/5 p-5"
+              >
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <p className="font-heading text-base font-semibold text-white">{compactTitle(item.title)}</p>
+                  <p className="text-sm text-slate-300">
+                    {item.risk} {"->"} {item.after_mitigation} ({item.roam})
+                  </p>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate-400">
+                  {item.actions?.[0] || "Monitor and review in sprint planning."}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">

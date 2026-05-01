@@ -48,6 +48,14 @@ export async function POST(request) {
       failure_probability: pythonResult.failure_probability,
       risk_level: pythonResult.risk_level,
       risk_factors: pythonResult.risk_factors ?? [],
+      model_type: pythonResult.model_type,
+      model_architecture: pythonResult.model_architecture ?? [],
+      model_justification: pythonResult.model_justification,
+      mitigation_justification: pythonResult.mitigation_justification,
+      mitigation_engine: pythonResult.mitigation_engine,
+      anomaly_detection: pythonResult.anomaly_detection,
+      training_mode: pythonResult.training_mode,
+      analysis_mode: pythonResult.analysis_mode,
       mitigation
     });
 
@@ -58,6 +66,14 @@ export async function POST(request) {
         failure_probability: saved.failure_probability,
         risk_level: saved.risk_level,
         risk_factors: saved.risk_factors,
+        model_type: saved.model_type,
+        model_architecture: saved.model_architecture,
+        model_justification: saved.model_justification,
+        mitigation_justification: saved.mitigation_justification,
+        mitigation_engine: saved.mitigation_engine,
+        anomaly_detection: saved.anomaly_detection,
+        training_mode: saved.training_mode,
+        analysis_mode: saved.analysis_mode,
         mitigation: saved.mitigation
       },
       { status: 200 }
